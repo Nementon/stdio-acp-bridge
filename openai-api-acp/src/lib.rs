@@ -170,6 +170,9 @@ pub async fn run() {
                         });
                         None
                     }
+                    "session/cancel" => {
+                        None
+                    }
                     _ => Some(JsonRpcResponse {
                         jsonrpc: "2.0",
                         id: id.clone(),

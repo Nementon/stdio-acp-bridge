@@ -373,7 +373,7 @@ impl Adapter {
     }
 
     pub async fn handle_session_load(&mut self, id: Value, params: &Value) -> JsonRpcResponse {
-        let session_id = match params.get("sessionId").and_then(|v| v.as_str()) {
+        let session_id = match params.get("sessionId").or_else(|| params.get("session_id")).and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
                 return JsonRpcResponse {
@@ -556,7 +556,7 @@ impl Adapter {
     }
 
     pub fn handle_session_set_model(&mut self, id: Value, params: &Value) -> JsonRpcResponse {
-        let session_id = match params.get("sessionId").and_then(|v| v.as_str()) {
+        let session_id = match params.get("sessionId").or_else(|| params.get("session_id")).and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
                 return JsonRpcResponse {

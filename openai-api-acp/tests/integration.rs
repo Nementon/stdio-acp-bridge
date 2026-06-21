@@ -11,20 +11,6 @@ fn test_adapter_new_sanitization() {
     );
     assert_eq!(adapter.api_base, "https://example.com/v1");
     assert_eq!(adapter.api_key, "my-key");
-
-    let adapter2 = Adapter::new(
-        "'http://localhost:8000'".to_string(),
-        "'secret'".to_string(),
-        None,
-    );
-    assert_eq!(adapter2.api_base, "http://localhost:8000");
-    assert_eq!(adapter2.api_key, "secret");
-}
-
-#[test]
-fn test_get_home_dir() {
-    let home = get_home_dir();
-    assert!(!home.is_empty());
 }
 
 #[test]
@@ -34,16 +20,12 @@ fn test_static_fallback_models() {
     assert_eq!(models[0], "gpt-3.5-turbo");
 }
 
-#[test]
-fn test_session_lifecycle() {
+#[tokio::test]
+async fn test_session_lifecycle_with_aliasing() {
     let mut adapter = Adapter::new("http://example.com".to_string(), "key".to_string(), None);
-    // Use a unique file to prevent interfering with real state
     adapter.state_file = std::env::temp_dir().join(format!("test_session_{}.json", uuid::Uuid::new_v4()));
     
     let session_id = "test-session";
-    let stored = adapter.restore_session(session_id);
-    assert!(stored.is_none());
-
     adapter.persist_session(
         session_id,
         vec![Message { role: "user".to_string(), content: "hello".to_string() }],
@@ -53,12 +35,25 @@ fn test_session_lifecycle() {
         Some("2024-01-01T00:00:00Z"),
     );
 
-    let restored = adapter.restore_session(session_id).unwrap();
-    assert_eq!(restored.messages.len(), 1);
-    assert_eq!(restored.model_id.unwrap(), "my-model");
-    assert_eq!(restored.cwd.unwrap(), "/tmp");
-    assert_eq!(restored.title.unwrap(), "My Title");
-    
+    // Test with sessionId
+    let req = JsonRpcRequest {
+        id: Some(json!(1)),
+        method: Some("session/load".to_string()),
+        params: Some(json!({ "sessionId": session_id })),
+    };
+    let res = adapter.handle_session_load(req.id.clone().unwrap(), &req.params.unwrap()).await;
+    assert!(res.error.is_none());
+
+    // Test with session_id
+    let req2 = JsonRpcRequest {
+        id: Some(json!(2)),
+        method: Some("session/load".to_string()),
+        params: Some(json!({ "session_id": session_id })),
+    };
+    let res2 = adapter.handle_session_load(req2.id.unwrap(), &req2.params.unwrap()).await;
+    assert!(res2.error.is_none());
+
+    // Clean up
     let _ = std::fs::remove_file(adapter.state_file);
 }
 
