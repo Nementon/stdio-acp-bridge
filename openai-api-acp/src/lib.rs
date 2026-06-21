@@ -25,6 +25,9 @@ struct Args {
 
     #[arg(long, env = "STDIO_ACPB_STATE_DIR")]
     state_dir: Option<String>,
+
+    #[arg(long, visible_alias = "log-file")]
+    debug_log: Option<String>,
 }
 
 pub async fn run() {
@@ -39,6 +42,7 @@ pub async fn run() {
         args.api_key,
         args.state_dir,
     )));
+    let debug_log_path = args.debug_log;
 
     // Warm up models
     {
@@ -53,6 +57,7 @@ pub async fn run() {
     let (out_tx, mut out_rx) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
 
     // Writer task
+    let debug_log_writer = debug_log_path.clone();
     tokio::spawn(async move {
         while let Some(Some(msg)) = out_rx.recv().await {
             if stdout.write_all(msg.as_bytes()).await.is_err() {
@@ -64,12 +69,25 @@ pub async fn run() {
             if stdout.flush().await.is_err() {
                 break;
             }
+            if let Some(path) = &debug_log_writer {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                    use std::io::Write;
+                    let _ = writeln!(f, "-> {}", msg);
+                }
+            }
         }
     });
 
     while let Ok(Some(line)) = reader.next_line().await {
         if line.trim().is_empty() {
             continue;
+        }
+
+        if let Some(path) = &debug_log_path {
+            if let Ok(mut log_file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                use std::io::Write;
+                let _ = writeln!(log_file, "<- {}", line);
+            }
         }
 
         let req: Result<JsonRpcRequest, _> = serde_json::from_str(&line);
