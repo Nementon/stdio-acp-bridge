@@ -1,0 +1,6 @@
+[submodule "agent-client-protocol"]
+	path = agent-client-protocol
+	url = https://github.com/agentclientprotocol/agent-client-protocol.git
+[submodule "intelligent-terminal"]
+	path = intelligent-terminal
+	url = https://github.com/microsoft/intelligent-terminal.git
