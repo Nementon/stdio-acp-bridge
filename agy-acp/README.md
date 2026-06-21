@@ -17,6 +17,7 @@
 - **Session persistence** — saves and restores conversation IDs and step indices across restarts
 - **Model selection** — `session/setModel` and `session/setConfigOption` for switching Gemini models at runtime
 - **Cancellation** — per-session cancellation via `session/cancel` or `Ctrl-C`
+- **JSON-RPC Debug Logging** — Built-in support to capture complete `<-` ingress and `->` egress traffic for debugging.
 - **Windows-native** — correct path handling, `USERPROFILE`-based home directory resolution
 
 ## Prerequisites
@@ -25,44 +26,42 @@
 - [`agy`](https://developers.google.com/gemini) — Google Antigravity CLI, must be on `PATH`
 - A valid Gemini account / API key (via `GEMINI_API_KEY` or `~/.gemini/antigravity-cli/settings.json`)
 
-## Installation
+## Usage via Orchestrator
+
+While `agy-acp` can be compiled independently, it is natively integrated into the `stdio-acp-bridge` orchestrator. The easiest way to run it is to pass the `--bridge agy` parameter or configure it in `stdio-acp-bridge.yml`.
 
 ```powershell
-# Windows
-cd agy-acp
-cargo build --release
-# Binary: target\release\agy-acp.exe
+# Using the root orchestrator
+cargo run --release -- --bridge agy
+
+# With explicit state and conversations directories via the unified orchestrator configuration:
+cargo run --release -- --config stdio-acp-bridge.yml
 ```
 
-```bash
-# Linux / macOS
-cd agy-acp
-cargo build --release
-# Binary: target/release/agy-acp
-```
+## Usage as Standalone Binary
 
-## Usage
-
-`agy-acp` is an ACP server — it reads JSON-RPC requests from stdin and writes responses and notifications to stdout. It is intended to be launched by an ACP client (such as Windows Intelligent Terminal) rather than used interactively.
+You can also bypass the orchestrator completely and run `agy-acp` directly as a standalone binary. This is useful if you only want to deploy this specific bridge without the surrounding orchestrator framework.
 
 ```powershell
-# Windows — launch directly
+# Build only the standalone binary
+cargo build --release -p agy-acp
+
+# Run directly
 .\target\release\agy-acp.exe
 
-# With explicit state and conversations directories
-.\target\release\agy-acp.exe --state-dir $env:APPDATA\agy-acp --conversations-dir $env:USERPROFILE\.gemini\antigravity-cli\conversations
-
-# With a debug log
-.\target\release\agy-acp.exe --debug-log C:\Temp\agy-acp.log
+# With explicit command line arguments
+.\target\release\agy-acp.exe --state-dir "C:\path\to\state" --conversations-dir "C:\path\to\conversations"
 ```
 
 ## CLI Flags & Environment Variables
 
-| Flag | Env variable | Default | Description |
+If invoked as a standalone CLI or configured via the YAML orchestrator, it supports the following options:
+
+| YAML Key | Env variable | Default | Description |
 |---|---|---|---|
-| `--state-dir` | `STDIO_ACPB_STATE_DIR` | `~/.stdio-acpb/agy-acp` | Directory for session state (`sessions.json`) |
-| `--conversations-dir` | `STDIO_ACPB_CONVERSATIONS_DIR` | `~/.gemini/antigravity-cli/conversations` | Directory containing Gemini conversation `.db` files |
-| `--debug-log` / `--log-file` | — | *(none)* | Path to a file where raw JSON-RPC traffic is logged |
+| `state_dir` | `STDIO_ACPB_STATE_DIR` | `~/.stdio-acpb/agy-acp` | Directory for session state (`sessions.json`) |
+| `conversations_dir` | `STDIO_ACPB_CONVERSATIONS_DIR` | `~/.gemini/antigravity-cli/conversations` | Directory containing Gemini conversation `.db` files |
+| `debug_log` | `STDIO_ACPB_DEBUG_LOG` | *(none)* | Path to a file where raw JSON-RPC traffic is logged |
 
 ## ACP Methods Supported
 
@@ -81,65 +80,15 @@ cargo build --release
 | `session/setModel` | Switch the Gemini model for a session |
 | `session/setConfigOption` | Set a named config option (currently `model`) |
 
-## Development
+## Development & Testing
+
+The crate supports comprehensive local testing, including End-to-End JSON-RPC tests:
 
 ```bash
-cargo test        # run unit tests (no auth required)
+cargo test        # run unit and end-to-end integration tests (no auth required)
 cargo test -- --ignored  # run integration tests (require auth + built binary)
 ```
 
 ---
 
 *Part of the [`stdio-acp-bridge`](../README.md) suite.*
-PS D:\LLMs\tools\stdio-acp-bridge\agy-acp>
-PS D:\LLMs\tools\stdio-acp-bridge\agy-acp> Set-Content README.md -Value "# agy-acp (Google Antigravity STDIO ACP Bridge)
-
- `agy-acp` is a high-performance Rust utility that acts as a bridge between standard I/O (STDIO) and the Antigravity Communication Protocol (ACP). It allows developers to interact with ACP-compliant services or tools directly from the command line without needing to handle complex protocol framing manually.
-
- ## Features
-
- - **Transparent Bridging**: Seamlessly maps standard input/output to ACP messages.
- - **High Performance**: Built with Rust to ensure low-latency communication.
- - **STDIO Compatible**: Easily pipeable to other command-line tools.
- - **ACP Compliance**: Handles the heavy lifting of the Antigravity Communication Protocol.
-
- ## Prerequisites
-
- - Rust and Cargo installed (Required for building from source).
- - A target ACP-compliant service or tool.
-
- ## Installation
-
- To build the project from source, navigate to the project root directory and run:
-
- ```bash
- cargo build --release
- ```
-
- The resulting binary will be located in `target/release/agy-acp`.
-
- ## Usage
-
- You can use `agy-acp` by piping standard input into it or redirecting its output.
-
- ### Basic Example
- To send a message to an ACP service:
- ```bash
- echo "Your message here" | ./target/release/agy-acp
- ```
-
- ### Interactive Use
- To use it in an interactive session:
- ```bash
- ./target/release/agy-acp
- ```
-
- ## Development
-
- To contribute to this project:
- 1. Clone the repository.
- 2. Run `cargo test` to ensure existing functionality is preserved.
- 3. Submit a pull request with your changes.
-
- ---
- *This tool is part of the `stdio-acp-bridge` suite."

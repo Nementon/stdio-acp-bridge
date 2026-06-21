@@ -20,54 +20,64 @@ Intelligent Terminal natively integrates with any ACP-compliant agent CLI. The b
    winget install --id Microsoft.IntelligentTerminal -e
    ```
 
-2. Build the bridge you want to use (see per-project instructions below).
+2. Build the orchestrator bridge using Cargo.
 
-3. Register the compiled binary as an agent in Intelligent Terminal's settings, pointing to the bridge executable. Intelligent Terminal will manage the process lifecycle and communicate over STDIO using ACP.
+3. Register the compiled binary as an agent in Intelligent Terminal's settings, pointing to the bridge executable and its YAML configuration file. Intelligent Terminal will manage the process lifecycle and communicate over STDIO using ACP.
 
 > **Requirements:** Windows 10 2004 (19041) or later. Rust toolchain required to build from source.
 
 ---
 
-## Projects
+## The Orchestrator
+
+The project provides a single unified `stdio-acp-bridge` orchestrator. The root binary manages routing to multiple backend bridges dynamically based on its configuration. It supports multi-layered configurations:
+
+1. **YAML File:** Passed via `-c` / `--config <FILE>`, falling back to `stdio-acp-bridge.yml` in the current working directory.
+2. **Environment Variables:** Options prefixed with `STDIO_ACPB_`.
+3. **CLI Arguments:** Hard overrides like `--bridge`.
+
+### YAML Configuration Example (`stdio-acp-bridge.yml`)
+
+The orchestrator determines which bridge to execute using the `bridge` field. Each sub-bridge has its own dedicated configuration block.
+
+```yaml
+# Specify the bridge to use: "agy" or "openai"
+bridge: "openai"
+
+# Configuration for the Google Antigravity bridge
+agy:
+  state_dir: "C:\\path\\to\\custom\\state"
+  conversations_dir: "C:\\path\\to\\conversations"
+  debug_log: "C:\\Temp\\agy-bridge-debug.log"
+
+# Configuration for the OpenAI proxy bridge
+openai:
+  api_base: "http://localhost:11434/v1"
+  api_key: "ollama"
+  state_dir: "C:\\path\\to\\custom\\state"
+  debug_log: "C:\\Temp\\openai-bridge-debug.log"
+```
+
+You can then run the orchestrator:
+
+```powershell
+cargo run --release -- --config stdio-acp-bridge.yml
+```
+
+### JSON-RPC Debug Logging
+All bridges support full ingress (`<-`) and egress (`->`) JSON-RPC traffic tracing. You can enable this by passing the `--debug-log <FILE>` argument (or setting `debug_log` in the YAML configuration / `STDIO_ACPB_AGY_DEBUG_LOG` / `STDIO_ACPB_OPENAI_DEBUG_LOG` in the environment).
+
+---
+
+## Available Bridges
 
 ### [`agy-acp`](./agy-acp/)
 
 A high-performance Rust bridge between STDIO and the **Google Antigravity (Gemini)** CLI (`agy`). It wraps the `agy` subprocess, surfaces streaming conversation updates as ACP `session/update` notifications, and persists session state across restarts.
 
-**Key features:**
-- Full ACP session lifecycle: `session/new`, `session/load`, `session/resume`, `session/fork`, `session/close`, `session/delete`
-- Real-time streaming of Gemini responses via SQLite conversation database polling
-- Session state persistence and restoration
-- Cancellation support (`session/cancel`)
-- Windows-native path handling
-
-```powershell
-cd agy-acp
-cargo build --release
-# Binary: agy-acp\target\release\agy-acp.exe
-```
-
 ### [`openai-api-acp`](./openai-api-acp/)
 
 A lightweight ACP proxy that bridges ACP `session/prompt` calls to any **OpenAI-compatible HTTP API** — including [vLLM](https://github.com/vllm-project/vllm), [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/), and OpenAI itself.
-
-**Key features:**
-- Translates ACP JSON-RPC to `POST /v1/chat/completions`
-- Streams responses back as ACP notifications
-- Configurable via environment variables
-
-```powershell
-cd openai-api-acp
-cargo build --release
-# Binary: openai-api-acp\target\release\openai-api-acp.exe
-```
-
-**Configuration:**
-
-| Variable | Default | Description |
-|---|---|---|
-| `OPENAI_API_BASE` | `http://localhost:8000/v1` | Base URL of the OpenAI-compatible API |
-| `OPENAI_API_KEY` | `dummy-key` | API key |
 
 ---
 
@@ -91,8 +101,9 @@ git submodule update --init --recursive
 Prerequisites: [Rust](https://rustup.rs/) (stable toolchain).
 
 ```powershell
-# Build all workspace members
+# Build the unified orchestrator binary
 cargo build --release
+# The resulting binary is located at target/release/stdio-acp-bridge.exe
 ```
 
 ---
