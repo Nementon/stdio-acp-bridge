@@ -223,21 +223,20 @@ impl Adapter {
 
 use clap::Parser;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone, Default, serde::Deserialize)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     #[arg(long, env = "STDIO_ACPB_STATE_DIR")]
-    state_dir: Option<String>,
+    pub state_dir: Option<String>,
 
     #[arg(long, env = "STDIO_ACPB_CONVERSATIONS_DIR")]
-    conversations_dir: Option<String>,
+    pub conversations_dir: Option<String>,
 
     #[arg(long, visible_alias = "log-file")]
-    debug_log: Option<String>,
+    pub debug_log: Option<String>,
 }
 
-pub async fn run() {
-    let args = Args::parse();
+pub async fn run(args: Args) {
     let debug_log_path = args.debug_log;
     let state_dir = args.state_dir;
     let conv_dir = args.conversations_dir;

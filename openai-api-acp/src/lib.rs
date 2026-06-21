@@ -10,33 +10,51 @@ pub mod types;
 use adapter::Adapter;
 use types::{JsonRpcRequest, JsonRpcResponse};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone, serde::Deserialize)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     #[arg(
         long,
         env = "OPENAI_API_BASE",
         default_value = "http://localhost:8000/v1"
     )]
-    api_base: String,
+    #[serde(default = "default_api_base")]
+    pub api_base: String,
 
     #[arg(long, env = "OPENAI_API_KEY", default_value = "dummy-key")]
-    api_key: String,
+    #[serde(default = "default_api_key")]
+    pub api_key: String,
 
     #[arg(long, env = "STDIO_ACPB_STATE_DIR")]
-    state_dir: Option<String>,
+    pub state_dir: Option<String>,
 
     #[arg(long, visible_alias = "log-file")]
-    debug_log: Option<String>,
+    pub debug_log: Option<String>,
 }
 
-pub async fn run() {
+fn default_api_base() -> String {
+    "http://localhost:8000/v1".to_string()
+}
+fn default_api_key() -> String {
+    "dummy-key".to_string()
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            api_base: default_api_base(),
+            api_key: default_api_key(),
+            state_dir: None,
+            debug_log: None,
+        }
+    }
+}
+
+pub async fn run(args: Args) {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_writer(std::io::stderr)
         .init();
-
-    let args = Args::parse();
     let adapter = Arc::new(tokio::sync::Mutex::new(Adapter::new(
         args.api_base,
         args.api_key,

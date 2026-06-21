@@ -1,4 +1,5 @@
 #[tokio::main]
 async fn main() {
-    openai_api_acp::run().await;
+    use clap::Parser;
+    openai_api_acp::run(openai_api_acp::Args::parse()).await;
 }

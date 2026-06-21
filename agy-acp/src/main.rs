@@ -1,4 +1,5 @@
 #[tokio::main]
 async fn main() {
-    agy_acp::run().await;
+    use clap::Parser;
+    agy_acp::run(agy_acp::Args::parse()).await;
 }
